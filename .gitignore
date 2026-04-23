@@ -1,0 +1,27 @@
+# Ignore build and install artifacts
+config/build/
+config/install/
+config/log/
+
+# Ignore editor and workspace settings
+.vscode/
+
+# Ignore Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore launch and script caches
+*.db
+*.log
+
+# Ignore ROS2 install and build markers
+build/
+install/
+log/
+
+# Ignore temporary files
+*.swp
+*.bak
+*~

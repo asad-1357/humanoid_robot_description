@@ -22,11 +22,13 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-# Install launch files
-install(
-  DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
+install(DIRECTORY
+  launch
+  config
+  urdf
+  DESTINATION share/${PROJECT_NAME}
 )
 
-
+# This tells ament we are a ROS 2 package
 ament_package()
+

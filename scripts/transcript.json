@@ -1,0 +1,75 @@
+{
+  "video": "~/Downloads/English_Verbs_trimmed.mp4",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 4.0,
+      "text": "What is a verb?"
+    },
+    {
+      "start": 6.0,
+      "end": 9.0,
+      "text": "A verb is a word that tells an action."
+    },
+    {
+      "start": 9.0,
+      "end": 12.0,
+      "text": "A verb tells what we do."
+    },
+    {
+      "start": 12.0,
+      "end": 21.0,
+      "text": "Jump, run, play. Those are all verbs."
+    },
+    {
+      "start": 21.0,
+      "end": 24.0,
+      "text": "He sits in the grass."
+    },
+    {
+      "start": 24.0,
+      "end": 28.0,
+      "text": "The word sits is a word that tells an action."
+    },
+    {
+      "start": 28.0,
+      "end": 33.0,
+      "text": "Sits is a verb."
+    },
+    {
+      "start": 33.0,
+      "end": 36.0,
+      "text": "I jump in the air."
+    },
+    {
+      "start": 36.0,
+      "end": 40.0,
+      "text": "The word jump is a word that tells an action."
+    },
+    {
+      "start": 40.0,
+      "end": 45.0,
+      "text": "Jump is a verb."
+    },
+    {
+      "start": 45.0,
+      "end": 48.0,
+      "text": "I run outside."
+    },
+    {
+      "start": 48.0,
+      "end": 52.0,
+      "text": "The word run is a word that tells an action."
+    },
+    {
+      "start": 52.0,
+      "end": 57.0,
+      "text": "Run is a verb."
+    },
+    {
+      "start": 57.0,
+      "end": 60.0,
+      "text": "She reads a book."
+    }
+  ]
+}

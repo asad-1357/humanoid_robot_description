@@ -1,0 +1,46 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+arm_controller:
+  ros__parameters:
+    joints:
+      - body_to_arm_joint_right
+      - shoulder_yaw_joint_right
+      - shoulder_pitch_joint_right
+      - elbow_joint_right
+      - palm_to_f1_right
+      - palm_to_f2_right
+      - palm_to_f3_right
+      - body_to_arm_joint_left
+      - shoulder_yaw_joint_left
+      - shoulder_pitch_joint_left
+      - elbow_joint_left
+      - palm_to_f1_left
+      - palm_to_f2_left
+      - palm_to_f3_left
+
+    command_interfaces:
+      - position
+
+    state_interfaces:
+      - position
+
+    state_publish_rate: 50.0      # Hz
+    action_monitor_rate: 20.0     # Hz
+
+    # Allow trajectory to start even if not at exact current position
+    allow_partial_joints_goal: false
+    open_loop_control: true
+
+    # Smooth interpolation settings
+    # These give teacher-like natural motion
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      goal_time: 1.0              # seconds tolerance at goal

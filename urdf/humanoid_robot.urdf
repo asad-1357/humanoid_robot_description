@@ -75,38 +75,126 @@
   <link name="arm_base_link_right"><visual><geometry><box size="0.05 0.05 0.05"/></geometry><material name="red"/></visual></link>
   <joint name="body_to_arm_joint_right" type="revolute">
     <parent link="body_base_link"/><child link="arm_base_link_right"/>
-    <origin xyz="0.35 0.04 0.3" rpy="0 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.18" effort="10" velocity="1"/>
+    <origin xyz="0.35 0.04 0.3" rpy="0 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="10" velocity="1"/>
   </joint>
 
   <link name="upper_arm_link_right"><visual><origin xyz="0.15 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.05" length="0.3"/></geometry><material name="purple"/></visual></link>
-  <joint name="shoulder_yaw_joint_right" type="revolute"><parent link="arm_base_link_right"/><child link="upper_arm_link_right"/><axis xyz="0 0 1"/><limit lower="-1.57" upper="-0.39" effort="10" velocity="1"/></joint>
+  <joint name="shoulder_yaw_joint_right" type="revolute">
+    <parent link="arm_base_link_right"/><child link="upper_arm_link_right"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.87" upper="1.57" effort="10" velocity="1"/>
+  </joint>
 
   <link name="forearm_link_right"><visual><origin xyz="0.125 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.25"/></geometry><material name="green"/></visual></link>
-  <joint name="shoulder_pitch_joint_right" type="revolute"><parent link="upper_arm_link_right"/><child link="forearm_link_right"/><origin xyz="0.3 0 0"/><axis xyz="0 1 0"/><limit lower="-0.025" upper="1.73" effort="10" velocity="1"/></joint>
+  <joint name="shoulder_pitch_joint_right" type="revolute"><parent link="upper_arm_link_right"/><child link="forearm_link_right"/><origin xyz="0.3 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.73" effort="10" velocity="1"/></joint>
 
   <link name="wrist_link_right"><visual><origin xyz="0.045 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.09"/></geometry><material name="black"/></visual></link>
-  <joint name="elbow_joint_right" type="revolute"><parent link="forearm_link_right"/><child link="wrist_link_right"/><origin xyz="0.25 0 0"/><axis xyz="0 1 0"/><limit lower="0" upper="1.57" effort="10" velocity="1"/></joint>
+ 
+ <joint name="elbow_joint_right" type="revolute">
+    <parent link="forearm_link_right"/><child link="wrist_link_right"/>
+    <origin xyz="0.25 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="0" upper="2.2" effort="10" velocity="1"/>
+  </joint>
 
-  <link name="finger_link_right"><visual><origin xyz="0.09 0 0" rpy="0 -1.5708 0"/><geometry><box size="0.02 0.02 0.09"/></geometry><material name="skin"/></visual></link>
-  <joint name="finger_joint_right" type="fixed"><parent link="wrist_link_right"/><child link="finger_link_right"/></joint>
+  <link name="palm_right">
+    <visual>
+      <origin xyz="0.02 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.04 0.08 0.02"/></geometry>
+      <material name="skin"/>
+    </visual>
+  </link>
+  <joint name="wrist_to_palm_right" type="fixed">
+    <parent link="wrist_link_right"/><child link="palm_right"/>
+    <origin xyz="0.09 0 0" rpy="0 0 0"/>
+  </joint>
 
+  <link name="finger_1_right">
+    <visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual>
+  </link>
+  <joint name="palm_to_f1_right" type="revolute">
+    <parent link="palm_right"/><child link="finger_1_right"/>
+    <origin xyz="0.04 0 0.02" rpy="0 -0.4 0"/> <axis xyz="0 1 0"/><limit lower="0" upper="0.8" effort="1" velocity="1"/>
+  </joint>
+
+  <link name="finger_2_right">
+    <visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual>
+  </link>
+  <joint name="palm_to_f2_right" type="revolute">
+    <parent link="palm_right"/><child link="finger_2_right"/>
+    <origin xyz="0.04 0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
+
+  <link name="finger_3_right">
+    <visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual>
+  </link>
+  <joint name="palm_to_f3_right" type="revolute">
+    <parent link="palm_right"/><child link="finger_3_right"/>
+    <origin xyz="0.04 -0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
+  
   <link name="arm_base_link_left"><visual><geometry><box size="0.05 0.05 0.05"/></geometry><material name="red"/></visual></link>
   <joint name="body_to_arm_joint_left" type="revolute">
     <parent link="body_base_link"/><child link="arm_base_link_left"/>
-    <origin xyz="-0.35 0.04 0.3" rpy="0 0 3.14159"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.18" effort="10" velocity="1"/>
+    <origin xyz="-0.35 0.04 0.3" rpy="0 0 3.14159"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="10" velocity="1"/>
   </joint>
 
   <link name="upper_arm_link_left"><visual><origin xyz="0.15 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.05" length="0.3"/></geometry><material name="purple"/></visual></link>
-  <joint name="shoulder_yaw_joint_left" type="revolute"><parent link="arm_base_link_left"/><child link="upper_arm_link_left"/><axis xyz="0 0 1"/><limit lower="0.0" upper="1.57" effort="10" velocity="1"/></joint>
-
+  <joint name="shoulder_yaw_joint_left" type="revolute">
+    <parent link="arm_base_link_left"/><child link="upper_arm_link_left"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.87" upper="1.87" effort="10" velocity="1"/>
+  </joint>
+  
   <link name="forearm_link_left"><visual><origin xyz="0.125 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.25"/></geometry><material name="green"/></visual></link>
-  <joint name="shoulder_pitch_joint_left" type="revolute"><parent link="upper_arm_link_left"/><child link="forearm_link_left"/><origin xyz="0.3 0 0"/><axis xyz="0 1 0"/><limit lower="-0.025" upper="1.57" effort="10" velocity="1"/></joint>
+  <joint name="shoulder_pitch_joint_left" type="revolute"><parent link="upper_arm_link_left"/><child link="forearm_link_left"/><origin xyz="0.3 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="10" velocity="1"/></joint>
 
   <link name="wrist_link_left"><visual><origin xyz="0.045 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.09"/></geometry><material name="black"/></visual></link>
-  <joint name="elbow_joint_left" type="revolute"><parent link="forearm_link_left"/><child link="wrist_link_left"/><origin xyz="0.25 0 0"/><axis xyz="0 1 0"/><limit lower="0" upper="1.57" effort="10" velocity="1"/></joint>
+  <joint name="elbow_joint_left" type="revolute">
+    <parent link="forearm_link_left"/><child link="wrist_link_left"/>
+    <origin xyz="0.25 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="0" upper="2.2" effort="10" velocity="1"/>
+  </joint>
 
-  <link name="finger_link_left"><visual><origin xyz="0.09 0 0" rpy="0 -1.5708 0"/><geometry><box size="0.02 0.02 0.09"/></geometry><material name="skin"/></visual></link>
-  <joint name="finger_joint_left" type="fixed"><parent link="wrist_link_left"/><child link="finger_link_left"/></joint>
+  <link name="palm_left">
+    <visual>
+      <origin xyz="0.02 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.04 0.08 0.02"/></geometry>
+      <material name="skin"/>
+    </visual>
+  </link>
+  <joint name="wrist_to_palm_left" type="fixed">
+    <parent link="wrist_link_left"/><child link="palm_left"/>
+    <origin xyz="0.09 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="finger_1_left">
+    <visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual>
+  </link>
+  <joint name="palm_to_f1_left" type="revolute">
+    <parent link="palm_left"/><child link="finger_1_left"/>
+    <origin xyz="0.04 0 0.02" rpy="0 -0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="0" upper="0.8" effort="1" velocity="1"/>
+  </joint>
+
+  <link name="finger_2_left">
+    <visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual>
+  </link>
+  <joint name="palm_to_f2_left" type="revolute">
+    <parent link="palm_left"/><child link="finger_2_left"/>
+    <origin xyz="0.04 0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
+
+  <link name="finger_3_left">
+    <visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual>
+  </link>
+  <joint name="palm_to_f3_left" type="revolute">
+    <parent link="palm_left"/><child link="finger_3_left"/>
+    <origin xyz="0.04 -0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
 
 <link name="eye_right">
     <visual>
@@ -157,6 +245,30 @@
     <child link="pupil_left"/>
     <origin xyz="0 -0.025 0" rpy="0 0 0"/>
   </joint>
+
+<ros2_control name="SimulationSystem" type="system">
+    <hardware>
+      <plugin>mock_components/GenericSystem</plugin>
+    </hardware>
+    
+    <joint name="body_to_arm_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_yaw_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_pitch_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="elbow_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f1_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f2_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f3_right"><command_interface name="position"/><state_interface name="position"/></joint>
+
+    <joint name="body_to_arm_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_yaw_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_pitch_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="elbow_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f1_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f2_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f3_left"><command_interface name="position"/><state_interface name="position"/></joint>
+</ros2_control>
+
+
 
 
 
