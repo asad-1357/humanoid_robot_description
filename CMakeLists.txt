@@ -26,6 +26,7 @@ install(DIRECTORY
   launch
   config
   urdf
+  materials
   DESTINATION share/${PROJECT_NAME}
 )
 

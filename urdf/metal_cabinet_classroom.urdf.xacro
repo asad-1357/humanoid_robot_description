@@ -1,0 +1,1046 @@
+<?xml version="1.0"?>
+<!--
+  ============================================================
+  ROBOT NAME  : metal_cabinet
+  DESCRIPTION : A cabinet-body robot with:
+                  - 4 legs (2 box front, 2 sphere rear)
+                  - Large main body (torso)
+                  - Galvanized top lid with raised ridge
+                  - Front-mounted LCD display panel (body screen)
+                    -> now textured with a custom image (verb chart)
+                  - Rotatable face LCD screen on top (±90° yaw)
+                  - Left & right articulated arms (3 DOF each)
+                  - 3-finger grippers on each hand
+  AUTHOR      : Generated with Claude (Anthropic)
+  SIMULATOR   : ROS2 / Gazebo / RViz2
+  CONTROL     : ros2_control → mock_components/GenericSystem
+
+  CHANGE LOG (this revision):
+    1. Removed FRONT wall (the wall facing the robot, opposite the
+       whiteboard) so the classroom is viewable from a camera/GUI
+       placed outside that side. Back wall (whiteboard), left wall,
+       and right wall are untouched.
+    2. student_chair macro now spawns a simple seated student
+       figure (head + torso + legs) on every seat so the room
+       doesn't look empty.
+    3. middle_cylinder (front body screen) is now textured with
+       verb_chart_screen.png instead of flat black. See the
+       "IMPORTANT - TEXTURE PATH" note near that link below.
+  ============================================================
+
+  COORDINATE FRAME CONVENTION (ROS standard):
+    +X = forward-right
+    +Y = forward (front face of robot)
+    +Z = up
+
+  ORIENTATION: Robot rotated 180° to face STUDENTS (−Y direction)
+               Previously faced whiteboard (+Y).
+
+  JOINT SUMMARY (all revolute unless noted):
+    face_yaw_joint             → LCD face screen yaw (left/right ±90°)
+    body_to_arm_joint_right    → Right shoulder pitch (raise/lower arm)
+    shoulder_yaw_joint_right   → Right shoulder yaw (rotate arm in/out)
+    shoulder_pitch_joint_right → Right elbow-equivalent pitch
+    elbow_joint_right          → Right elbow flex
+    palm_to_f1/f2/f3_right     → Right finger joints (grip)
+    [mirror joints for left arm]
+
+  TOTAL DOF : 15 (1 face + 7 per arm × 2)
+  ============================================================
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="humanoid_robot">
+
+  <!-- ===========================================================
+       MATERIALS
+       Used by RViz for colorization. Gazebo uses its own material
+       tags (<gazebo reference="..."><material>...</material>).
+       =========================================================== -->
+  <material name="dark_metal"><color rgba="0.15 0.15 0.15 1.0"/></material>  <!-- Main body / legs color -->
+  <material name="white"><color rgba="1.0 1.0 1.0 1.0"/></material>
+  <material name="black"><color rgba="0 0 0 1.0"/></material>                <!-- Speaker holes, wrists, labels -->
+  <material name="galvanized_metal"><color rgba="0.6 0.65 0.65 1.0"/></material> <!-- Top lid (silver-gray) -->
+  <material name="gray_metal"><color rgba="0.45 0.45 0.45 1.0"/></material>
+  <material name="lcd_glow"><color rgba="0.2 0.6 1.0 1.0"/></material>       <!-- Blue glowing LCD surface -->
+  <material name="red"><color rgba="1 0 0 1"/></material>                    <!-- Shoulder base blocks -->
+  <material name="purple"><color rgba="0.5 0 0.7 1"/></material>             <!-- Upper arm segments -->
+  <material name="green"><color rgba="0 1 0 1"/></material>                  <!-- Forearm segments -->
+  <material name="skin"><color rgba="1 0.60 0.0 1"/></material> 
+  <material name="brown"><color rgba="0.6 0.4 0.2 1.0"/></material>
+  <material name="light_blue"><color rgba="0.68 0.85 0.90 1.0"/></material>  <!-- Classroom wall color -->
+
+  <!-- Body-screen texture material (RViz reads plain URDF <texture>) -->
+  <material name="body_screen_texture">
+    <color rgba="1 1 1 1"/>
+    <texture filename="package://humanoid_robot_description/materials/textures/verb_chart_screen.png"/>
+  </material>
+
+  <!-- Whiteboard lecture-title texture (sans-serif "LECTURE NO # 01",
+       rendered with transparent background so it reads as marker
+       writing on the board rather than a solid tile) -->
+  <material name="lecture_text_texture">
+    <color rgba="1 1 1 1"/>
+    <texture filename="package://humanoid_robot_description/materials/textures/lecture_text.png"/>
+  </material>
+
+  <!-- Simple student-figure colors -->
+  <material name="student_skin"><color rgba="0.94 0.76 0.6 1.0"/></material>
+  <material name="student_shirt_a"><color rgba="0.85 0.25 0.25 1.0"/></material>
+  <material name="student_shirt_b"><color rgba="0.25 0.45 0.85 1.0"/></material>
+  <material name="student_shirt_c"><color rgba="0.30 0.65 0.35 1.0"/></material>
+  <material name="student_hair"><color rgba="0.25 0.15 0.08 1.0"/></material>
+
+
+  <xacro:macro name="student_chair" params="prefix x_pos y_pos shirt_material:=student_shirt_a">
+    <!-- Seat -->
+    <link name="${prefix}_seat">
+      <visual>
+        <geometry><box size="0.4 0.4 0.04"/></geometry>
+        <material name="black"/>
+      </visual>
+    </link>
+    <joint name="${prefix}_seat_joint" type="fixed">
+      <parent link="world"/>
+      <child link="${prefix}_seat"/>
+      <origin xyz="${x_pos} ${y_pos} 0.45"/>
+    </joint>
+
+    <!-- Leg 1 (Front Left) -->
+    <link name="${prefix}_l1"><visual><geometry><box size="0.04 0.04 0.45"/></geometry><material name="black"/></visual></link>
+    <joint name="${prefix}_l1_j" type="fixed"><parent link="${prefix}_seat"/><child link="${prefix}_l1"/><origin xyz="0.18 0.18 -0.225"/></joint>
+    <!-- Leg 2 (Front Right) -->
+    <link name="${prefix}_l2"><visual><geometry><box size="0.04 0.04 0.45"/></geometry><material name="black"/></visual></link>
+    <joint name="${prefix}_l2_j" type="fixed"><parent link="${prefix}_seat"/><child link="${prefix}_l2"/><origin xyz="-0.18 0.18 -0.225"/></joint>
+    <!-- Leg 3 (Back Left) -->
+    <link name="${prefix}_l3"><visual><geometry><box size="0.04 0.04 0.45"/></geometry><material name="black"/></visual></link>
+    <joint name="${prefix}_l3_j" type="fixed"><parent link="${prefix}_seat"/><child link="${prefix}_l3"/><origin xyz="0.18 -0.18 -0.225"/></joint>
+    <!-- Leg 4 (Back Right) -->
+    <link name="${prefix}_l4"><visual><geometry><box size="0.04 0.04 0.45"/></geometry><material name="black"/></visual></link>
+    <joint name="${prefix}_l4_j" type="fixed"><parent link="${prefix}_seat"/><child link="${prefix}_l4"/><origin xyz="-0.18 -0.18 -0.225"/></joint>
+
+    <!-- Gazebo material overrides (black) so chairs render correctly in gz-sim -->
+    <gazebo reference="${prefix}_seat"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_l1"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_l2"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_l3"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_l4"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+
+    <!-- =======================================================
+         SEATED STUDENT FIGURE
+         A simplified low-poly student sitting on this chair:
+           torso (box) + head (sphere) + hair cap (sphere shell)
+           + two legs (thighs, bent 90° toward the table) + two
+           arms resting on the lap.
+         Everything is parented to the seat so it moves as one
+         unit with the chair if the chair's origin ever changes.
+         Seat surface is at local z=+0.02 (top of the 0.04 seat).
+         ======================================================= -->
+
+    <!-- Torso -->
+    <link name="${prefix}_torso">
+      <visual><geometry><box size="0.22 0.16 0.28"/></geometry><material name="${shirt_material}"/></visual>
+      <collision><geometry><box size="0.22 0.16 0.28"/></geometry></collision>
+    </link>
+    <joint name="${prefix}_torso_joint" type="fixed">
+      <parent link="${prefix}_seat"/><child link="${prefix}_torso"/>
+      <origin xyz="0 0 0.16" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Head -->
+    <link name="${prefix}_head">
+      <visual><geometry><sphere radius="0.09"/></geometry><material name="student_skin"/></visual>
+      <collision><geometry><sphere radius="0.09"/></geometry></collision>
+    </link>
+    <joint name="${prefix}_head_joint" type="fixed">
+      <parent link="${prefix}_torso"/><child link="${prefix}_head"/>
+      <origin xyz="0 0 0.22" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Hair cap (top half-sphere look achieved with a slightly larger, offset sphere) -->
+    <link name="${prefix}_hair">
+      <visual><origin xyz="0 0 0.03"/><geometry><sphere radius="0.092"/></geometry><material name="student_hair"/></visual>
+    </link>
+    <joint name="${prefix}_hair_joint" type="fixed">
+      <parent link="${prefix}_head"/><child link="${prefix}_hair"/>
+      <origin xyz="0 -0.01 0.02" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Thighs: sit flat on the seat, pointing toward the whiteboard/robot (+Y)
+         so the student is facing forward, not away from the class. -->
+    <link name="${prefix}_thigh_l">
+      <visual><origin xyz="0 0.12 0"/><geometry><box size="0.09 0.24 0.08"/></geometry><material name="${shirt_material}"/></visual>
+    </link>
+    <joint name="${prefix}_thigh_l_joint" type="fixed">
+      <parent link="${prefix}_seat"/><child link="${prefix}_thigh_l"/>
+      <origin xyz="0.06 0.02 0.06" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${prefix}_thigh_r">
+      <visual><origin xyz="0 0.12 0"/><geometry><box size="0.09 0.24 0.08"/></geometry><material name="${shirt_material}"/></visual>
+    </link>
+    <joint name="${prefix}_thigh_r_joint" type="fixed">
+      <parent link="${prefix}_seat"/><child link="${prefix}_thigh_r"/>
+      <origin xyz="-0.06 0.02 0.06" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Arms resting on the lap, same +Y-facing side as the thighs -->
+    <link name="${prefix}_arm_l">
+      <visual><geometry><box size="0.06 0.22 0.06"/></geometry><material name="student_skin"/></visual>
+    </link>
+    <joint name="${prefix}_arm_l_joint" type="fixed">
+      <parent link="${prefix}_torso"/><child link="${prefix}_arm_l"/>
+      <origin xyz="0.12 0.05 -0.02" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${prefix}_arm_r">
+      <visual><geometry><box size="0.06 0.22 0.06"/></geometry><material name="student_skin"/></visual>
+    </link>
+    <joint name="${prefix}_arm_r_joint" type="fixed">
+      <parent link="${prefix}_torso"/><child link="${prefix}_arm_r"/>
+      <origin xyz="-0.12 0.05 -0.02" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Gazebo material overrides for the student figure -->
+    <gazebo reference="${prefix}_torso"><material><ambient>0.85 0.25 0.25 1</ambient><diffuse>0.85 0.25 0.25 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_head"><material><ambient>0.94 0.76 0.6 1</ambient><diffuse>0.94 0.76 0.6 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_hair"><material><ambient>0.25 0.15 0.08 1</ambient><diffuse>0.25 0.15 0.08 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_thigh_l"><material><ambient>0.85 0.25 0.25 1</ambient><diffuse>0.85 0.25 0.25 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_thigh_r"><material><ambient>0.85 0.25 0.25 1</ambient><diffuse>0.85 0.25 0.25 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_arm_l"><material><ambient>0.94 0.76 0.6 1</ambient><diffuse>0.94 0.76 0.6 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+    <gazebo reference="${prefix}_arm_r"><material><ambient>0.94 0.76 0.6 1</ambient><diffuse>0.94 0.76 0.6 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+  </xacro:macro>
+
+  <!-- TABLE MACRO -->
+  <xacro:macro name="student_table" params="prefix x_pos y_pos">
+    <!-- Tabletop -->
+    <link name="${prefix}_top">
+      <visual><geometry><box size="1.2 0.6 0.03"/></geometry><material name="brown"/></visual>
+    </link>
+    <joint name="${prefix}_joint" type="fixed">
+      <parent link="world"/><child link="${prefix}_top"/><origin xyz="${x_pos} ${y_pos} 0.75"/>
+    </joint>
+    <gazebo reference="${prefix}_top"><material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></gazebo>
+
+    <!-- Table Legs -->
+    <xacro:macro name="table_leg" params="suffix x_off y_off">
+      <link name="${prefix}_leg_${suffix}">
+        <visual><geometry><box size="0.05 0.05 0.75"/></geometry><material name="gray_metal"/></visual>
+      </link>
+      <joint name="${prefix}_leg_${suffix}_joint" type="fixed">
+        <parent link="${prefix}_top"/><child link="${prefix}_leg_${suffix}"/><origin xyz="${x_off} ${y_off} -0.375"/>
+      </joint>
+      <gazebo reference="${prefix}_leg_${suffix}"><material><ambient>0.45 0.45 0.45 1</ambient><diffuse>0.45 0.45 0.45 1</diffuse><specular>0.3 0.3 0.3 1</specular></material></gazebo>
+    </xacro:macro>
+
+    <xacro:table_leg suffix="fl" x_off="0.55" y_off="0.25"/>
+    <xacro:table_leg suffix="fr" x_off="-0.55" y_off="0.25"/>
+    <xacro:table_leg suffix="bl" x_off="0.55" y_off="-0.25"/>
+    <xacro:table_leg suffix="br" x_off="-0.55" y_off="-0.25"/>
+  </xacro:macro>
+  
+  
+  <!-- Palm and fingers -->
+
+
+  <!-- ===========================================================
+       WORLD AND BASE LINK
+       The world frame is the inertial reference.
+       The robot is rotated 180° around Z so it faces students (−Y).
+       =========================================================== -->
+  <link name="world"/>
+  
+  <!-- Base link: fixed at origin, acts as root of robot -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+    </inertial>
+  </link>
+  
+  <!-- Virtual joint connecting world to base_link -->
+  <joint name="virtual_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       LEGS
+       4 legs total:
+         Front-Left  & Front-Right → box shape (straight metal legs)
+         Rear-Left   & Rear-Right  → sphere shape (rubber feet / casters)
+
+       With 180° rotation, "front" is now toward students (−Y).
+       Leg positions are MIRRORED:
+         Front (toward students): y = −0.21
+         Rear (away from students): y = +0.21
+         z = 0.075  (half of 0.15m leg height)
+       =========================================================== -->
+
+  <!-- Front-Left leg (now on −Y side, toward students) -->
+  <link name="leg_front_left">
+    <inertial><mass value="0.8"/><inertia ixx="5e-4" ixy="0" ixz="0" iyy="5e-4" iyz="0" izz="1e-4"/></inertial>
+    <visual><geometry><box size="0.04 0.04 0.15"/></geometry><material name="dark_metal"/></visual>
+    <collision><geometry><box size="0.04 0.04 0.15"/></geometry></collision>
+  </link>
+  <joint name="leg_front_left_joint" type="fixed">
+    <parent link="base_link"/><child link="leg_front_left"/><origin xyz="0.26 -0.21 0.075" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Front-Right leg (now on −Y side, toward students) -->
+  <link name="leg_front_right">
+    <inertial><mass value="0.8"/><inertia ixx="5e-4" ixy="0" ixz="0" iyy="5e-4" iyz="0" izz="1e-4"/></inertial>
+    <visual><geometry><box size="0.04 0.04 0.15"/></geometry><material name="dark_metal"/></visual>
+    <collision><geometry><box size="0.04 0.04 0.15"/></geometry></collision>
+  </link>
+  <joint name="leg_front_right_joint" type="fixed">
+    <parent link="base_link"/><child link="leg_front_right"/><origin xyz="-0.26 -0.21 0.075" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Rear-Left leg (now on +Y side, away from students) -->
+  <link name="leg_rear_left">
+    <inertial><mass value="0.8"/><inertia ixx="5e-4" ixy="0" ixz="0" iyy="5e-4" iyz="0" izz="1e-4"/></inertial>
+    <visual><geometry><sphere radius="0.08"/></geometry><material name="black"/></visual>
+    <collision><geometry><sphere radius="0.08"/></geometry></collision>
+  </link>
+  <joint name="leg_rear_left_joint" type="fixed">
+    <parent link="base_link"/><child link="leg_rear_left"/><origin xyz="0.26 0.21 0.075" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Rear-Right leg (now on +Y side, away from students) -->
+  <link name="leg_rear_right">
+    <inertial><mass value="0.8"/><inertia ixx="5e-4" ixy="0" ixz="0" iyy="5e-4" iyz="0" izz="1e-4"/></inertial>
+    <visual><geometry><sphere radius="0.08"/></geometry><material name="black"/></visual>
+    <collision><geometry><sphere radius="0.08"/></geometry></collision>
+  </link>
+  <joint name="leg_rear_right_joint" type="fixed">
+    <parent link="base_link"/><child link="leg_rear_right"/><origin xyz="-0.26 0.21 0.075" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       MAIN BODY (Torso)
+       The large cabinet box that forms the robot's torso.
+
+       Dimensions : 0.60m wide × 0.50m deep × 1.20m tall
+       Center Z   : 0.75m above base (legs=0.15m + half-body=0.60m)
+
+       After 180° rotation, the front face now points toward
+       students (−Y direction) instead of whiteboard.
+       =========================================================== -->
+  <link name="main_body">
+    <inertial><mass value="25.0"/><inertia ixx="3.0" ixy="0" ixz="0" iyy="2.5" iyz="0" izz="1.5"/></inertial>
+    <visual><geometry><box size="0.60 0.50 1.20"/></geometry><material name="dark_metal"/></visual>
+    <collision><geometry><box size="0.60 0.50 1.20"/></geometry></collision>
+  </link>
+  <joint name="main_body_joint" type="fixed">
+    <parent link="base_link"/><child link="main_body"/><origin xyz="0 0 0.75" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       SHOULDER SPACERS
+       Small decorative blocks where the arms attach to the body.
+       These are purely visual — they represent the shoulder socket
+       housing. Fixed to main_body on each side at arm mount height.
+       =========================================================== -->
+
+  <!-- Right shoulder spacer -->
+  <link name="shoulder_spacer_right">
+    <visual><geometry><box size="0.07 0.07 0.07"/></geometry><material name="gray_metal"/></visual>
+  </link>
+  <joint name="spacer_right_joint" type="fixed">
+    <parent link="main_body"/><child link="shoulder_spacer_right"/>
+    <origin xyz="0.335 -0.04 0.35" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Left shoulder spacer (mirrored at negative X) -->
+  <link name="shoulder_spacer_left">
+    <visual><geometry><box size="0.07 0.07 0.07"/></geometry><material name="gray_metal"/></visual>
+  </link>
+  <joint name="spacer_left_joint" type="fixed">
+    <parent link="main_body"/><child link="shoulder_spacer_left"/>
+    <origin xyz="-0.335 -0.04 0.35" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       TOP LID
+       Galvanized (silver) metal cover sitting flush on top of body.
+       Matches body footprint exactly: 0.60m × 0.50m.
+       Has a raised center ridge (0.50m wide) to replicate the
+       folded-sheet-metal look seen in the original photo.
+
+       Joint origin z = 0.62:
+         body half-height (0.60) + lid half-thickness (0.02) = 0.62
+       =========================================================== -->
+  <link name="top_lid">
+    <inertial><mass value="3.0"/><inertia ixx="0.06" ixy="0" ixz="0" iyy="0.05" iyz="0" izz="0.08"/></inertial>
+    <!-- Base flat slab: exactly matches body width, no overhang -->
+    <visual><geometry><box size="0.60 0.50 0.04"/></geometry><material name="galvanized_metal"/></visual>
+    <!-- Raised center ridge on top of slab for the folded-metal look -->
+    <visual><origin xyz="0 0 0.032"/><geometry><box size="0.50 0.50 0.025"/></geometry><material name="galvanized_metal"/></visual>
+    <!-- Simplified single-box collision (covers both slab + ridge) -->
+    <collision><geometry><box size="0.60 0.50 0.065"/></geometry></collision>
+  </link>
+  <joint name="top_lid_joint" type="fixed">
+    <parent link="main_body"/><child link="top_lid"/><origin xyz="0 0 0.62" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       BODY FRONT LCD PANEL (middle_cylinder)
+       The large display / decorative panel on the front face of
+       the body (now facing students at −Y).
+
+       Positioned at y=−0.255 to sit flush on the front face (−Y).
+       Size: 0.42m wide × 0.28m tall (large front screen area).
+
+       IMPORTANT - TEXTURE PATH:
+         This panel now displays the "What Is A Verb?" chart image
+         instead of flat black. Two references are set up below so
+         the image shows in BOTH viewers:
+           1. RViz  -> plain URDF <material name="body_screen_texture">
+                       (defined near the top of this file) using the
+                       standard <texture filename="package://..."/>.
+           2. gz-sim -> <gazebo reference="middle_cylinder"><material>
+                       <pbr><albedo_map>...</albedo_map></pbr></material>
+                       below, in the Gazebo overrides section.
+         Both paths currently point to:
+           package://humanoid_robot_description/materials/textures/verb_chart_screen.png
+         Replace "metal_cabinet_robot" with your actual ROS package
+         name, and copy verb_chart_screen.png into
+         <your_package>/materials/textures/ (an example copy is
+         included alongside this file). If you'd rather not rebuild
+         a package right now, you can also swap "package://...” for
+         an absolute file path, e.g. file:///home/you/verb_chart_screen.png.
+       =========================================================== -->
+  <link name="middle_cylinder">
+    <!-- Thin flat panel flush with front face of body, now carrying the image texture -->
+    <visual><origin xyz="0 -0.255 0"/><geometry><box size="0.42 0.01 0.28"/></geometry><material name="body_screen_texture"/></visual>
+  </link>
+  <joint name="middle_cylinder_joint" type="fixed">
+    <parent link="main_body"/><child link="middle_cylinder"/>
+    <!-- z=+0.10 places the panel in the upper-center of the body -->
+    <origin xyz="0 0 0.10" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Small status bar / label strip just above the LCD panel -->
+  <link name="status_bar">
+    <visual>
+      <geometry><box size="0.10 0.01 0.03"/></geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <joint name="status_bar_joint" type="fixed">
+    <parent link="middle_cylinder"/>
+    <child link="status_bar"/>
+    <!-- Offset upward from LCD panel center by 0.25m -->
+    <origin xyz="0 -0.255 0.25" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       SPEAKER / PORT HOLES
+       Two circular holes on the lower front face of the body
+       (now facing students at −Y), representing speaker grilles
+       or ventilation ports.
+
+       Positioned symmetrically: x = ±0.15m, y = −0.252 (front face)
+       z = -0.32 (lower third of body, below center)
+       Radius = 0.08m each.
+       =========================================================== -->
+
+  <!-- Left speaker hole -->
+  <link name="port_hole_left">
+    <!-- rpy="1.5708 0 0" rotates the cylinder to face forward (−Y) -->
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/><geometry><cylinder radius="0.08" length="0.015"/></geometry><material name="black"/></visual>
+  </link>
+  <joint name="port_hole_left_joint" type="fixed">
+    <parent link="main_body"/><child link="port_hole_left"/><origin xyz="0.15 -0.252 -0.32" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Right speaker hole (mirrored at negative X) -->
+  <link name="port_hole_right">
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/><geometry><cylinder radius="0.08" length="0.015"/></geometry><material name="black"/></visual>
+  </link>
+  <joint name="port_hole_right_joint" type="fixed">
+    <parent link="main_body"/><child link="port_hole_right"/><origin xyz="-0.15 -0.252 -0.32" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       FACE LCD SCREEN ASSEMBLY
+       A small LCD "face" panel that sits on top of the lid and can
+       rotate left/right (yaw) to simulate the robot looking around.
+
+       Structure:
+         top_lid
+           └── screen_neck      (fixed cylinder post — the pivot base)
+                 └── face_yaw_joint  (REVOLUTE — left/right rotation)
+                       └── lcd_face_panel  (the actual screen panel)
+
+       screen_neck: r=0.045m, l=0.10m cylinder standing upright.
+       lcd_face_panel: 0.32m wide × 0.27m tall × 0.04m thick box
+                       with a thinner glowing blue surface inset.
+
+       face_yaw_joint limits: ±90° (−1.5708 to +1.5708 rad)
+       Axis: Z (vertical), so rotation is in the horizontal plane.
+       =========================================================== -->
+
+  <!-- Neck post: cylindrical pillar that the screen sits on -->
+  <link name="screen_neck">
+    <visual><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark_metal"/></visual>
+  </link>
+  <joint name="screen_neck_joint" type="fixed">
+    <parent link="top_lid"/><child link="screen_neck"/>
+    <!-- z=0.12 places neck above the lid ridge; y=−0.06 leans it toward students -->
+    <origin xyz="0 -0.06 0.12" rpy="0 0 0"/>
+  </joint>
+
+  <!-- LCD face panel: the "head" carrier. Gazebo (gz-sim) only supports one
+       <gazebo><material> per LINK, not per <visual>, so a single link with
+       7 differently-colored visuals (the old approach) renders as flat gray
+       in Gazebo even though it looks fine in RViz. Fix: give every colored
+       feature its own link, fixed to this carrier, each with its own
+       <gazebo reference="..."><material> block further down the file. -->
+  <link name="lcd_face_panel">
+    <collision>
+      <origin xyz="0 0 0.065"/>
+      <geometry><box size="0.32 0.04 0.27"/></geometry>
+    </collision>
+  </link>
+
+  <!-- 1. Bezel (dark outer frame) -->
+  <link name="lcd_bezel">
+    <visual><geometry><box size="0.32 0.04 0.27"/></geometry><material name="dark_metal"/></visual>
+  </link>
+  <joint name="lcd_bezel_joint" type="fixed">
+    <parent link="lcd_face_panel"/><child link="lcd_bezel"/><origin xyz="0 0 0.065" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 2. Glowing blue screen surface -->
+  <link name="lcd_screen">
+    <visual><geometry><box size="0.28 0.008 0.23"/></geometry><material name="lcd_glow"/></visual>
+  </link>
+  <joint name="lcd_screen_joint" type="fixed">
+    <parent link="lcd_face_panel"/><child link="lcd_screen"/><origin xyz="0 -0.022 0.065" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 3. Left eyeball (white sclera sphere, bulges out from the face) -->
+  <link name="eye_left">
+    <visual><geometry><sphere radius="0.035"/></geometry><material name="white"/></visual>
+  </link>
+  <joint name="eye_left_joint" type="fixed">
+    <parent link="lcd_face_panel"/><child link="eye_left"/><origin xyz="0.07 -0.045 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 3b. Left cornea/pupil (black, sits on the eyeball's front surface) -->
+  <link name="pupil_left">
+    <visual><geometry><sphere radius="0.014"/></geometry><material name="black"/></visual>
+  </link>
+  <joint name="pupil_left_joint" type="fixed">
+    <parent link="lcd_face_panel"/><child link="pupil_left"/><origin xyz="0.07 -0.078 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 4. Right eyeball (white sclera sphere) -->
+  <link name="eye_right">
+    <visual><geometry><sphere radius="0.035"/></geometry><material name="white"/></visual>
+  </link>
+  <joint name="eye_right_joint" type="fixed">
+    <parent link="lcd_face_panel"/><child link="eye_right"/><origin xyz="-0.07 -0.045 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 4b. Right cornea/pupil (black) -->
+  <link name="pupil_right">
+    <visual><geometry><sphere radius="0.014"/></geometry><material name="black"/></visual>
+  </link>
+  <joint name="pupil_right_joint" type="fixed">
+    <parent link="lcd_face_panel"/><child link="pupil_right"/><origin xyz="-0.07 -0.078 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 5. Mouth (white) -->
+  <link name="mouth">
+    <visual><geometry><box size="0.1 0.005 0.01"/></geometry><material name="white"/></visual>
+  </link>
+  <joint name="mouth_joint" type="fixed">
+    <parent link="lcd_face_panel"/><child link="mouth"/><origin xyz="0 -0.027 0.02" rpy="1.5708 0 0"/>
+  </joint>
+  <!-- REVOLUTE joint — this is what makes the face screen rotate -->
+  <joint name="face_yaw_joint" type="revolute">
+    <parent link="screen_neck"/><child link="lcd_face_panel"/>
+    <!-- Pivot point at the top of the neck -->
+    <origin xyz="0 0 0.06" rpy="0 0 0"/>
+    <!-- Rotation around vertical Z axis (left/right yaw) -->
+    <axis xyz="0 0 1"/>
+    <!-- ±90° travel, 5 N·m effort, 0.5 rad/s max speed -->
+    <limit lower="-1.5708" upper="1.5708" effort="5.0" velocity="0.5"/>
+  </joint>
+  
+  <!-- ===========================================================
+       CLASSROOM ROOM SHELL (3 walls — front wall removed)
+       Encloses the classroom on 3 sides. All walls use the
+       light_blue material. The original whiteboard wall (behind
+       the robot, +Y side) doubles as the back wall of the room,
+       with a proper white whiteboard panel mounted on its inner
+       (student-facing) face.
+
+       The FRONT wall (the one facing the robot, opposite the
+       whiteboard, at y=-6.05) has been REMOVED per request, so the
+       room is now open on that side for a clear camera/viewing
+       angle straight down the rows of students. Back wall (with
+       whiteboard), left wall, and right wall are unchanged.
+
+       Room footprint (top-down):
+         x: -4.5 .. +4.5   (9.0 m wide)
+         y: -6.05 .. +1.6  (7.65 m deep, open at the -6.05 end)
+         z: 0 .. 3.0        (3.0 m tall)
+       =========================================================== -->
+
+  <!-- BACK WALL (behind the robot, holds the whiteboard) -->
+  <link name="back_wall">
+    <visual>
+      <geometry><box size="9.0 0.1 3.0"/></geometry>
+      <material name="light_blue"/>
+    </visual>
+    <collision>
+      <geometry><box size="9.0 0.1 3.0"/></geometry>
+    </collision>
+  </link>
+  <joint name="back_wall_joint" type="fixed">
+    <parent link="world"/>
+    <child link="back_wall"/>
+    <origin xyz="0 1.55 1.5" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Actual whiteboard panel mounted on the back wall's student-facing side -->
+  <link name="whiteboard_panel">
+    <visual>
+      <geometry><box size="4.0 0.02 1.2"/></geometry>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <geometry><box size="4.0 0.02 1.2"/></geometry>
+    </collision>
+  </link>
+  <joint name="whiteboard_panel_joint" type="fixed">
+    <parent link="back_wall"/>
+    <child link="whiteboard_panel"/>
+    <!-- Sits just off the inner face of the wall, at typical writing height -->
+    <origin xyz="0 -0.06 -0.1" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Thin frame strip around the whiteboard for a finished look -->
+  <link name="whiteboard_frame">
+    <visual>
+      <geometry><box size="4.05 0.04 1.25"/></geometry>
+      <material name="galvanized_metal"/>
+    </visual>
+  </link>
+  <joint name="whiteboard_frame_joint" type="fixed">
+    <parent link="whiteboard_panel"/>
+    <child link="whiteboard_frame"/>
+    <origin xyz="0 0.01 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- "LECTURE NO # 01" title, sans-serif, near the top of the board.
+       Thin panel sitting just proud of the whiteboard's writing surface
+       (offset -0.013 in Y, i.e. on the room-facing side) so it doesn't
+       z-fight with whiteboard_panel. Sized 1.6m x 0.48m to match the
+       4:1.2 aspect ratio of lecture_text.png, positioned near the top
+       third of the 1.2m-tall board. -->
+  <link name="whiteboard_lecture_text">
+    <visual>
+      <geometry><box size="1.6 0.005 0.48"/></geometry>
+      <material name="lecture_text_texture"/>
+    </visual>
+  </link>
+  <joint name="whiteboard_lecture_text_joint" type="fixed">
+    <parent link="whiteboard_panel"/>
+    <child link="whiteboard_lecture_text"/>
+    <origin xyz="0 -0.013 0.3" rpy="0 0 0"/>
+  </joint>
+
+  <!-- FRONT WALL REMOVED (was here, opposite the whiteboard, past the
+       last row of seating). Left intentionally blank per request. -->
+
+  <!-- LEFT WALL -->
+  <link name="left_wall">
+    <visual>
+      <geometry><box size="0.1 7.6 3.0"/></geometry>
+      <material name="light_blue"/>
+    </visual>
+    <collision>
+      <geometry><box size="0.1 7.6 3.0"/></geometry>
+    </collision>
+  </link>
+  <joint name="left_wall_joint" type="fixed">
+    <parent link="world"/>
+    <child link="left_wall"/>
+    <origin xyz="4.55 -2.25 1.5" rpy="0 0 0"/>
+  </joint>
+
+  <!-- RIGHT WALL -->
+  <link name="right_wall">
+    <visual>
+      <geometry><box size="0.1 7.6 3.0"/></geometry>
+      <material name="light_blue"/>
+    </visual>
+    <collision>
+      <geometry><box size="0.1 7.6 3.0"/></geometry>
+    </collision>
+  </link>
+  <joint name="right_wall_joint" type="fixed">
+    <parent link="world"/>
+    <child link="right_wall"/>
+    <origin xyz="-4.55 -2.25 1.5" rpy="0 0 0"/>
+  </joint>
+
+
+<!-- ROW 1 (Near Whiteboard) -->
+  <xacro:student_chair prefix="ch_r1_c" x_pos="0"   y_pos="-1.4" shirt_material="student_shirt_a"/>
+  <xacro:student_chair prefix="ch_r1_l" x_pos="1.5" y_pos="-1.4" shirt_material="student_shirt_b"/>
+  <xacro:student_chair prefix="ch_r1_r" x_pos="-1.5" y_pos="-1.4" shirt_material="student_shirt_c"/>
+  
+  <!-- ROW 2 -->
+  <xacro:student_chair prefix="ch_r2_c" x_pos="0"   y_pos="-2.9" shirt_material="student_shirt_b"/>
+  <xacro:student_chair prefix="ch_r2_l" x_pos="1.5" y_pos="-2.9" shirt_material="student_shirt_c"/>
+  <xacro:student_chair prefix="ch_r2_r" x_pos="-1.5" y_pos="-2.9" shirt_material="student_shirt_a"/>
+
+  <!-- ROW 3 -->
+  <xacro:student_chair prefix="ch_r3_c" x_pos="0"   y_pos="-4.4" shirt_material="student_shirt_c"/>
+  <xacro:student_chair prefix="ch_r3_l" x_pos="1.5" y_pos="-4.4" shirt_material="student_shirt_a"/>
+  <xacro:student_chair prefix="ch_r3_r" x_pos="-1.5" y_pos="-4.4" shirt_material="student_shirt_b"/>
+
+  
+ <!-- TABLES (Using the new macro with legs) -->
+  <!-- Row 1 -->
+  <xacro:student_table prefix="t1c" x_pos="0"    y_pos="-1.0"/>
+  <xacro:student_table prefix="t1l" x_pos="1.5"  y_pos="-1.0"/>
+  <xacro:student_table prefix="t1r" x_pos="-1.5" y_pos="-1.0"/>
+
+  <!-- Row 2 -->
+  <xacro:student_table prefix="t2c" x_pos="0"    y_pos="-2.5"/>
+  <xacro:student_table prefix="t2l" x_pos="1.5"  y_pos="-2.5"/>
+  <xacro:student_table prefix="t2r" x_pos="-1.5" y_pos="-2.5"/>
+
+  <!-- Row 3 -->
+  <xacro:student_table prefix="t3c" x_pos="0"    y_pos="-4.0"/>
+  <xacro:student_table prefix="t3l" x_pos="1.5"  y_pos="-4.0"/>
+  <xacro:student_table prefix="t3r" x_pos="-1.5" y_pos="-4.0"/>
+  <!-- ===========================================================
+       RIGHT ARM
+       Chain: main_body → arm_base → upper_arm → forearm → wrist
+              → palm → finger_1 / finger_2 / finger_3
+
+       Mount point on body: x=+0.37 (right edge), y=−0.04 (adjusted
+       for 180° rotation), z=+0.35
+
+       JOINTS (all revolute):
+         body_to_arm_joint_right    : shoulder raise/lower (pitch, Y axis)
+         shoulder_yaw_joint_right   : shoulder rotate in/out (yaw, Z axis)
+         shoulder_pitch_joint_right : second shoulder pitch (Y axis)
+         elbow_joint_right          : elbow flex (Y axis, 0 to 2.2 rad)
+         palm_to_f1/f2/f3_right     : finger curl joints (Y axis)
+       =========================================================== -->
+
+  <!-- Shoulder base block — the revolute mount point on the body -->
+  <link name="arm_base_link_right">
+    <visual><geometry><box size="0.07 0.07 0.07"/></geometry><material name="red"/></visual>
+    <collision><geometry><box size="0.07 0.07 0.07"/></geometry></collision>
+  </link>
+  <!-- Shoulder pitch: raises/lowers the entire arm -->
+  <joint name="body_to_arm_joint_right" type="revolute">
+    <parent link="main_body"/><child link="arm_base_link_right"/>
+    <origin xyz="0.37 -0.04 0.35" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Upper arm: thick cylinder, 0.30m long, extends along +X -->
+  <link name="upper_arm_link_right">
+    <!-- visual origin offset 0.15 to center cylinder on its length -->
+    <visual><origin xyz="0.15 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.05" length="0.3"/></geometry><material name="purple"/></visual>
+    <collision><origin xyz="0.15 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.05" length="0.3"/></geometry></collision>
+  </link>
+  <!-- Shoulder yaw: rotates the arm in/out (like swinging arm forward) -->
+  <joint name="shoulder_yaw_joint_right" type="revolute">
+    <parent link="arm_base_link_right"/><child link="upper_arm_link_right"/>
+    <axis xyz="0 0 1"/><limit lower="-1.87" upper="1.57" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Forearm: thinner cylinder, 0.25m long -->
+  <link name="forearm_link_right">
+    <visual><origin xyz="0.125 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.25"/></geometry><material name="green"/></visual>
+    <collision><origin xyz="0.125 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.25"/></geometry></collision>
+  </link>
+  <!-- Second shoulder pitch: allows forearm to pitch up/down from elbow area -->
+  <joint name="shoulder_pitch_joint_right" type="revolute">
+    <parent link="upper_arm_link_right"/><child link="forearm_link_right"/>
+    <!-- origin at end of upper arm (0.3m from shoulder) -->
+    <origin xyz="0.3 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.73" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Wrist: short thin cylinder, 0.09m long -->
+  <link name="wrist_link_right">
+    <visual><origin xyz="0.045 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.09"/></geometry><material name="black"/></visual>
+  </link>
+  <!-- Elbow flex: bends the wrist/hand section (0 to 126°) -->
+  <joint name="elbow_joint_right" type="revolute">
+    <parent link="forearm_link_right"/><child link="wrist_link_right"/>
+    <!-- origin at end of forearm (0.25m from shoulder_pitch joint) -->
+    <origin xyz="0.25 0 0"/><axis xyz="0 1 0"/><limit lower="0" upper="2.2" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Palm: flat rectangular box representing the hand -->
+  <link name="palm_right">
+    <visual><origin xyz="0.02 0 0"/><geometry><box size="0.04 0.08 0.02"/></geometry><material name="skin"/></visual>
+  </link>
+  <!-- Fixed wrist-to-palm: no DOF here, palm is rigidly attached -->
+  <joint name="wrist_to_palm_right" type="fixed">
+    <parent link="wrist_link_right"/><child link="palm_right"/>
+    <origin xyz="0.09 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Finger 1 (top finger — curls upward from palm top edge) -->
+  <link name="finger_1_right"><visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual></link>
+  <joint name="palm_to_f1_right" type="revolute">
+    <parent link="palm_right"/><child link="finger_1_right"/>
+    <!-- Offset to top of palm (z=+0.02), pre-rotated -0.4 rad (slightly open) -->
+    <origin xyz="0.04 0 0.02" rpy="0 -0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="0" upper="0.8" effort="1" velocity="1"/>
+  </joint>
+
+  <!-- Finger 2 (bottom-right finger — curls downward) -->
+  <link name="finger_2_right"><visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual></link>
+  <joint name="palm_to_f2_right" type="revolute">
+    <parent link="palm_right"/><child link="finger_2_right"/>
+    <!-- Offset to lower-right of palm -->
+    <origin xyz="0.04 0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
+
+  <!-- Finger 3 (bottom-left finger — curls downward) -->
+  <link name="finger_3_right"><visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual></link>
+  <joint name="palm_to_f3_right" type="revolute">
+    <parent link="palm_right"/><child link="finger_3_right"/>
+    <!-- Offset to lower-left of palm -->
+    <origin xyz="0.04 -0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       LEFT ARM
+       Mirror of the right arm. Mount at x=−0.37 (left edge).
+
+       With the 180° world rotation applied, the arm orientation
+       logic is simplified: both arms attach with rpy="0 0 0",
+       and the world rotation handles the final orientation.
+       =========================================================== -->
+
+  <!-- Left shoulder base block -->
+  <link name="arm_base_link_left">
+    <visual><geometry><box size="0.07 0.07 0.07"/></geometry><material name="red"/></visual>
+    <collision><geometry><box size="0.07 0.07 0.07"/></geometry></collision>
+  </link>
+  <!-- Left arm shoulder pitch -->
+  <joint name="body_to_arm_joint_left" type="revolute">
+    <parent link="main_body"/><child link="arm_base_link_left"/>
+    <origin xyz="-0.37 -0.04 0.35" rpy="0 0 3.14159"/>
+    <axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Left upper arm -->
+  <link name="upper_arm_link_left">
+    <visual><origin xyz="0.15 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.05" length="0.3"/></geometry><material name="purple"/></visual>
+  </link>
+  <joint name="shoulder_yaw_joint_left" type="revolute">
+    <parent link="arm_base_link_left"/><child link="upper_arm_link_left"/>
+    <axis xyz="0 0 1"/><limit lower="-1.87" upper="1.87" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Left forearm -->
+  <link name="forearm_link_left">
+    <visual><origin xyz="0.125 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.25"/></geometry><material name="green"/></visual>
+  </link>
+  <joint name="shoulder_pitch_joint_left" type="revolute">
+    <parent link="upper_arm_link_left"/><child link="forearm_link_left"/>
+    <origin xyz="0.3 0 0"/><axis xyz="0 1 0"/><limit lower="-1.57" upper="1.57" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Left wrist -->
+  <link name="wrist_link_left">
+    <visual><origin xyz="0.045 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.03" length="0.09"/></geometry><material name="black"/></visual>
+  </link>
+  <joint name="elbow_joint_left" type="revolute">
+    <parent link="forearm_link_left"/><child link="wrist_link_left"/>
+    <origin xyz="0.25 0 0"/><axis xyz="0 1 0"/><limit lower="0" upper="2.2" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Left palm -->
+  <link name="palm_left">
+    <visual><origin xyz="0.02 0 0"/><geometry><box size="0.04 0.08 0.02"/></geometry><material name="skin"/></visual>
+  </link>
+  <joint name="wrist_to_palm_left" type="fixed">
+    <parent link="wrist_link_left"/><child link="palm_left"/><origin xyz="0.09 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Left Finger 1 (top) -->
+  <link name="finger_1_left"><visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual></link>
+  <joint name="palm_to_f1_left" type="revolute">
+    <parent link="palm_left"/><child link="finger_1_left"/>
+    <origin xyz="0.04 0 0.02" rpy="0 -0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="0" upper="0.8" effort="1" velocity="1"/>
+  </joint>
+
+  <!-- Left Finger 2 (bottom-right) -->
+  <link name="finger_2_left"><visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual></link>
+  <joint name="palm_to_f2_left" type="revolute">
+    <parent link="palm_left"/><child link="finger_2_left"/>
+    <origin xyz="0.04 0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
+
+  <!-- Left Finger 3 (bottom-left) -->
+  <link name="finger_3_left"><visual><origin xyz="0.04 0 0"/><geometry><box size="0.08 0.015 0.015"/></geometry><material name="skin"/></visual></link>
+  <joint name="palm_to_f3_left" type="revolute">
+    <parent link="palm_left"/><child link="finger_3_left"/>
+    <origin xyz="0.04 -0.02 -0.02" rpy="0 0.4 0"/>
+    <axis xyz="0 1 0"/><limit lower="-0.8" upper="0" effort="1" velocity="1"/>
+  </joint>
+
+
+  <!-- ===========================================================
+       ROS2 CONTROL
+       Registers all 15 revolute joints with the ros2_control
+       framework using the mock hardware plugin (for simulation).
+
+       In a real robot, replace:
+         <plugin>mock_components/GenericSystem</plugin>
+       with your hardware interface plugin, e.g.:
+         <plugin>my_robot_hardware/MyHardwareInterface</plugin>
+
+       Each joint exposes:
+         command_interface "position" → send position commands
+         state_interface   "position" → read current position
+         state_interface   "velocity" → read current velocity (face only)
+
+       Controllers to pair with this (in your controller YAML):
+         - joint_state_broadcaster  (publishes /joint_states)
+         - joint_trajectory_controller (arms)
+         - position_controller (face yaw)
+       =========================================================== -->
+  <ros2_control name="CabinetRobotSystem" type="system">
+    <hardware><plugin>mock_components/GenericSystem</plugin></hardware>
+
+    <!-- Face screen: left/right yaw (1 DOF) -->
+    <joint name="face_yaw_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Right arm (7 DOF total) -->
+    <joint name="body_to_arm_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_yaw_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_pitch_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="elbow_joint_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f1_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f2_right"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f3_right"><command_interface name="position"/><state_interface name="position"/></joint>
+
+    <!-- Left arm (7 DOF total, mirrored from right) -->
+    <joint name="body_to_arm_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_yaw_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="shoulder_pitch_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="elbow_joint_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f1_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f2_left"><command_interface name="position"/><state_interface name="position"/></joint>
+    <joint name="palm_to_f3_left"><command_interface name="position"/><state_interface name="position"/></joint>
+  </ros2_control>
+
+  <!-- ===========================================================
+       GAZEBO MATERIAL OVERRIDES
+       gz-sim (Gazebo Harmonic) only applies one <gazebo><material>
+       per LINK; it does NOT reliably read the plain URDF
+       <material><color> used above for RViz. Every single-visual
+       link below gets an explicit ambient/diffuse/specular so the
+       robot is colored correctly when spawned in Gazebo, not just
+       in RViz. (Macro-based links, like chairs/tables/students, have
+       their own <gazebo> tags inside their macros, above.)
+       =========================================================== -->
+  <gazebo reference="leg_front_left"><material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="leg_front_right"><material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="leg_rear_left"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="leg_rear_right"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="main_body"><material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="shoulder_spacer_right"><material><ambient>0.45 0.45 0.45 1</ambient><diffuse>0.45 0.45 0.45 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="shoulder_spacer_left"><material><ambient>0.45 0.45 0.45 1</ambient><diffuse>0.45 0.45 0.45 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="top_lid"><material><ambient>0.6 0.65 0.65 1</ambient><diffuse>0.6 0.65 0.65 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+
+  <!-- middle_cylinder (body screen): textured with the verb-chart image
+       instead of the old flat-black override. See the "IMPORTANT -
+       TEXTURE PATH" note above the middle_cylinder link definition. -->
+  <gazebo reference="middle_cylinder">
+    <material>
+      <ambient>1 1 1 1</ambient>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <pbr>
+        <metal>
+          <albedo_map>package://humanoid_robot_description/materials/textures/verb_chart_screen.png</albedo_map>
+        </metal>
+      </pbr>
+    </material>
+  </gazebo>
+
+  <gazebo reference="status_bar"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="port_hole_left"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="port_hole_right"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="screen_neck"><material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="lcd_bezel"><material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="eye_left"><material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="pupil_left"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="eye_right"><material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="pupil_right"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="mouth"><material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="back_wall"><material><ambient>0.68 0.85 0.90 1</ambient><diffuse>0.68 0.85 0.90 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="whiteboard_panel"><material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="whiteboard_frame"><material><ambient>0.6 0.65 0.65 1</ambient><diffuse>0.6 0.65 0.65 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+
+  <!-- Lecture title panel: textured with lecture_text.png (sans-serif
+       "LECTURE NO # 01"). Same pbr/albedo_map pattern as middle_cylinder. -->
+  <gazebo reference="whiteboard_lecture_text">
+    <material>
+      <ambient>1 1 1 1</ambient>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <pbr>
+        <metal>
+          <albedo_map>package://humanoid_robot_description/materials/textures/lecture_text.png</albedo_map>
+        </metal>
+      </pbr>
+    </material>
+  </gazebo>
+  <gazebo reference="left_wall"><material><ambient>0.68 0.85 0.90 1</ambient><diffuse>0.68 0.85 0.90 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="right_wall"><material><ambient>0.68 0.85 0.90 1</ambient><diffuse>0.68 0.85 0.90 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="arm_base_link_right"><material><ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="upper_arm_link_right"><material><ambient>0.5 0 0.7 1</ambient><diffuse>0.5 0 0.7 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="forearm_link_right"><material><ambient>0 1 0 1</ambient><diffuse>0 1 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="wrist_link_right"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="palm_right"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="finger_1_right"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="finger_2_right"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="finger_3_right"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="arm_base_link_left"><material><ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="upper_arm_link_left"><material><ambient>0.5 0 0.7 1</ambient><diffuse>0.5 0 0.7 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="forearm_link_left"><material><ambient>0 1 0 1</ambient><diffuse>0 1 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="wrist_link_left"><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="palm_left"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="finger_1_left"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="finger_2_left"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="finger_3_left"><material><ambient>1 0.60 0.0 1</ambient><diffuse>1 0.60 0.0 1</diffuse><specular>0.2 0.2 0.2 1</specular></material></gazebo>
+  <gazebo reference="lcd_screen"><material><ambient>0.2 0.6 1.0 1</ambient><diffuse>0.2 0.6 1.0 1</diffuse><specular>0.3 0.3 0.3 1</specular><emissive>0.1 0.3 0.5 1</emissive></material></gazebo>
+
+</robot>
